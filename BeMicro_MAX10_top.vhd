@@ -15,6 +15,7 @@
 
 LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
+use ieee.numeric_std.all;
 
 entity BeMicro_MAX10_top is
 port(
@@ -221,7 +222,7 @@ architecture arch of BeMicro_MAX10_top is
 		generic (
 			C_CNT_LEN: natural := 24);
 		port (
-			CLK         :  in std_logic; -- 100kHz
+			CLK         :  in std_logic; -- min 100kHz
 			RESET       :  in std_logic;
 
 			LB_A        :  in std_logic;
@@ -236,7 +237,7 @@ architecture arch of BeMicro_MAX10_top is
 		port (
 			CLK: in std_logic;
 
-			SPEED: in std_logic_vector(15 downto 0);
+			SPEED: in signed(15 downto 0);
 			BREAK: in std_logic;
 
 			BRIDGE1: out std_logic;
@@ -262,34 +263,37 @@ architecture arch of BeMicro_MAX10_top is
 		);
 	end component pid;
 
-
 	component pll is
 		port
 		(
 			inclk0		: in std_logic  := '0';
 			c0			: out std_logic ;
-			c1			: out std_logic ;
-			c2			: out std_logic ;
 			locked		: out std_logic
 		);
 	end component pll;
 
 	component reg_if
 	port (
-	  CLK        : in  std_logic;
-	  RST        : in  std_logic;
-	  PERIOD1    : in  std_logic_vector(15 downto 0);
-	  PERIOD2    : in  std_logic_vector(15 downto 0);
-	  SETPNT1    : out std_logic_vector(15 downto 0);
-	  SETPNT2    : out std_logic_vector(15 downto 0);
-	  P0         : out std_logic_vector(31 downto 0);
-	  P1         : out std_logic_vector(31 downto 0);
-	  P2         : out std_logic_vector(31 downto 0);
-	  P3         : out std_logic_vector(31 downto 0);
-	  RESET_POS  : out std_logic_vector(31 downto 0);
-	  RESET_CMD1 : out std_logic;
-	  RESET_CMD2 : out std_logic
-	);
+		CLK: in std_logic;
+		RST: in std_logic;
+
+		SERIAL_IN:  in  std_logic;
+		SERIAL_OUT: out std_logic;
+
+		PERIOD1: in  std_logic_vector(15 downto 0);
+		PERIOD2: in  std_logic_vector(15 downto 0);
+
+		SETPNT1: out std_logic_vector(15 downto 0);
+		SETPNT2: out std_logic_vector(15 downto 0);
+
+		P0: out std_logic_vector(31 downto 0);
+		P1: out std_logic_vector(31 downto 0);
+		P2: out std_logic_vector(31 downto 0);
+		P3: out std_logic_vector(31 downto 0);
+
+		RESET_POS: out std_logic_vector(31 downto 0);
+		RESET_CMD1: out std_logic;
+		RESET_CMD2: out std_logic);
 	end component reg_if;
 
 	component period
@@ -306,59 +310,76 @@ architecture arch of BeMicro_MAX10_top is
 
 	signal pll_locked: std_logic;
 
-	signal rst_16: std_logic;
-	signal rst_sync_16: std_logic_vector(2 downto 0);
-	signal clk_16: std_logic;
-	signal clk_en_2: std_logic;
+	signal rst: std_logic;
+	signal rst_sync: std_logic_vector(2 downto 0);
+	signal clk: std_logic;
 
-	signal rx_data: std_logic_vector(7 downto 0);
-	signal tx_data: std_logic_vector(7 downto 0);
-	signal clk_div_cnt: unsigned(2 downto 0) := (others => '0');
+
+	signal reg_period1: std_logic_vector(15 downto 0);
+	signal reg_period2: std_logic_vector(15 downto 0);
+	signal reg_setpnt1: std_logic_vector(15 downto 0);
+	signal reg_setpnt2: std_logic_vector(15 downto 0);
+	signal reg_p0: std_logic_vector(31 downto 0);
+	signal reg_p1: std_logic_vector(31 downto 0);
+	signal reg_p2: std_logic_vector(31 downto 0);
+	signal reg_p3: std_logic_vector(31 downto 0);
+	signal reg_reset_pos: std_logic_vector(31 downto 0);
+	signal cmd_reset_1: std_logic;
+	signal cmd_reset_2: std_logic;
+
+	signal speed1: signed(15 downto 0);
+	signal speed2: signed(15 downto 0);
+
+	signal pwm_cnt: unsigned(14 downto 0) := (others => '0');
 begin
 
 	pll_inst: pll port map (
 		inclk0 => SYS_CLK,
 		c0 => clk_16,
-		c1 => clk_2,
-		c2 => clk_1,
 		locked => pll_locked);
 
-	rst_sync_proc: process (clk_16)
+	rst_sync_proc: process (clk)
 	begin
 		if pll_locked = '0' then
-			rst_sync_16 <= (others => '1');
-		elsif rising_edge(clk_16) then
-			rst_sync_16 <= rst_sync_16(1 downto 0) & '0';
+			rst_sync <= (others => '1');
+		elsif rising_edge(clk) then
+			rst_sync <= rst_sync(1 downto 0) & '0';
 		end if;
 	end process;
 
-	rst_16 <= rst_sync_16(2);
+	rst <= rst_sync(2);
+
+	cnt_proc: process(CLK)
+	begin
+		if rising_edge(CLK) then
+			pwm_cnt <= pwm_cnt + 1;
+		end if;
+	end process;
 
 	reg_if_i : reg_if
 	port map (
-	  CLK        => CLK,
-	  RST        => RST,
-	  PERIOD1    => PERIOD1,
-	  PERIOD2    => PERIOD2,
-	  SETPNT1    => SETPNT1,
-	  SETPNT2    => SETPNT2,
-	  P0         => P0,
-	  P1         => P1,
-	  P2         => P2,
-	  P3         => P3,
-	  RESET_POS  => RESET_POS,
-	  RESET_CMD1 => RESET_CMD1,
-	  RESET_CMD2 => RESET_CMD2
-	);
+	  CLK        => clk,
+	  RST        => rst,
+	  PERIOD1    => reg_period1,
+	  PERIOD2    => reg_period2,
+	  SETPNT1    => reg_setpnt1,
+	  SETPNT2    => reg_setpnt2,
+	  P0         => reg_p0,
+	  P1         => reg_p1
+	  P2         => reg_p2,
+	  P3         => reg_p3,
+	  RESET_POS  => reg_reset_pos,
+	  RESET_CMD1 => cmd_reset_1,
+	  RESET_CMD2 => cmd_reset_2);
 
 	period_inst1 : period
 	generic map (
 	  CNT_LEN => 16
 	)
 	port map (
-	  CLK     => CLK,
+	  CLK     => clk,
 	  SIG_IN  => SIG_IN,
-	  CNT_OUT => PERIOD1
+	  CNT_OUT => reg_period1
 	);
 
 	period_inst2 : period
@@ -366,37 +387,57 @@ begin
 	  CNT_LEN => 16
 	)
 	port map (
-	  CLK     => CLK,
+	  CLK     => clk,
 	  SIG_IN  => SIG_IN,
-	  CNT_OUT => PERIOD2
+	  CNT_OUT => reg_period2
 	);
 
-	pid_inst1 : pid
+	pid_speed1 : pid
 	port map (
-	  RESET    => RESET,
-	  CLK      => CLK,
+	  RESET    => rst,
+	  CLK      => clk,
 	  START    => START,
-	  VAL_IN   => VAL_IN,
-	  SETPNT   => SETPNT,
-	  P0       => P0,
-	  P1       => P1,
-	  P2       => P2,
-	  P3       => P3,
-	  CTRL_OUT => CTRL_OUT
+	  VAL_IN   => reg_period1,
+	  SETPNT   => reg_setpnt1,
+	  P0       => reg_p0,
+	  P1       => reg_p1,
+	  P2       => reg_p2,
+	  P3       => reg_p3,
+	  CTRL_OUT => speed1
 	);
 
-	pid_inst2 : pid
+	pid_speed2 : pid
 	port map (
-	  RESET    => RESET,
-	  CLK      => CLK,
+	  RESET    => rst,
+	  CLK      => clk,
 	  START    => START,
-	  VAL_IN   => VAL_IN,
-	  SETPNT   => SETPNT,
-	  P0       => P0,
-	  P1       => P1,
-	  P2       => P2,
-	  P3       => P3,
-	  CTRL_OUT => CTRL_OUT
+	  VAL_IN   => reg_period2,
+	  SETPNT   => reg_setpnt2,
+	  P0       => reg_p0,
+	  P1       => reg_p1,
+	  P2       => reg_p2,
+	  P3       => reg_p3,
+	  CTRL_OUT => speed2
+	);
+
+	dc_motor1 : dc_motor
+	port map (
+	  CLK     => clk,
+		PWM_CNT => pwm_cnt,
+	  SPEED   => speed1,
+	  BREAK   => BREAK,
+	  BRIDGE1 => BRIDGE1,
+	  BRIDGE2 => BRIDGE2
+	);
+
+	dc_motor2 : dc_motor
+	port map (
+	  CLK     => clk,
+		PWM_CNT => pwm_cnt,
+	  SPEED   => speed2,
+	  BREAK   => BREAK,
+	  BRIDGE1 => BRIDGE1,
+	  BRIDGE2 => BRIDGE2
 	);
 
 
