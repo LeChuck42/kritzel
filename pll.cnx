@@ -1,0 +1,20 @@
+
+LICENSE_ID: "DEVICE_FAMILY_MAX 10"	80714123A5152012030F
+LICENSE_ID: "FEATURE_STRATIXGX_DPA"	80714123L5152012030B
+LICENSE_ID: "FEATURE_STRATIXGX_BASIC"	80714123D5152012030F
+
+
+SUPPORTED_DEVICE_FAMILY: "MAX 10"
+
+WIZARD_TITLE: "ALTPLL"
+QUARTUS_VERSION: "Version 17.0"
+QUARTUS_SVERSION: "17.0.2 Build 602 07/19/2017 SJ Lite Edition:07/19/2017"
+QUARTUS_BUILD_DATE: "07/19/2017"
+ALTERA_COPYRIGHT: "Copyright (C) 2017  Intel Corporation. All rights reserved."
+
+
+HELP_MENU_ITEM: FALSE "IUG$altpll Megafunction User Guide$http://www.altera.com/literature/ug/ug_altpll.pdf"
+HELP_MENU_ITEM: FALSE "IUG$General-Purpose PLLs in Stratix (GX) Devices$http://www.altera.com/literature/hb/stx/ch_1_vol_2.pdf"
+HELP_MENU_ITEM: FALSE "IUG$PLLs in Stratix II Devices$http://www.altera.com/literature/hb/stx2/stx2_sii52001.pdf"
+HELP_MENU_ITEM: FALSE "IUG$Clock Networks and PLLs in Stratix III Devices$http://www.altera.com/literature/hb/stx3/stx3_siii51006.pdf	"
+HELP_MENU_ITEM: FALSE "IUG$PLLs in Cyclone II Devices$http://www.altera.com/literature/hb/cyc2/cyc2_cii51007.pdf"
