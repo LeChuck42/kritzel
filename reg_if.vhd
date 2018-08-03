@@ -6,22 +6,25 @@ entity reg_if is
 	port (
 		CLK: in std_logic;
 		RST: in std_logic;
-		
+
 		SERIAL_IN:  in  std_logic;
 		SERIAL_OUT: out std_logic;
 
-		PERIOD1: in  std_logic_vector(15 downto 0);
-		PERIOD2: in  std_logic_vector(15 downto 0);
+		SPEED1: in  signed(15 downto 0);
+		SPEED2: in  signed(15 downto 0);
 
-		SETPNT1: out std_logic_vector(15 downto 0);
-		SETPNT2: out std_logic_vector(15 downto 0);
+		POS1: in  signed(31 downto 0);
+		POS2: in  signed(31 downto 0);
 
-		P0: out std_logic_vector(31 downto 0);
-		P1: out std_logic_vector(31 downto 0);
-		P2: out std_logic_vector(31 downto 0);
-		P3: out std_logic_vector(31 downto 0);
+		SETPNT1: out signed(15 downto 0);
+		SETPNT2: out signed(15 downto 0);
 
-		RESET_POS: out std_logic_vector(31 downto 0);
+		P0: out signed(31 downto 0);
+		P1: out signed(31 downto 0);
+		P2: out signed(31 downto 0);
+		P3: out signed(31 downto 0);
+
+		RESET_POS: out signed(31 downto 0);
 		RESET_CMD1: out std_logic;
 		RESET_CMD2: out std_logic
 	);
@@ -68,7 +71,7 @@ begin
 		  TX_FULL    => tx_full,
 		  TX_DATA    => tx_data,
 		  TX_WRITE   => tx_write,
-		  RX_EMPTY   => rx_read,
+		  RX_EMPTY   => rx_empty,
 		  RX_DATA    => rx_data,
 		  RX_READ    => rx_read,
 		  SERIAL_IN  => SERIAL_IN,
@@ -77,6 +80,7 @@ begin
 
 		tx_data <= tx_buf(31 downto 24);
 		tx_write <= '1' when tx_cnt /= 0 else '0';
+		rx_read <= '1' when rx_empty = '0' else '0';
 
 	reg_proc: process(RST, CLK)
 	begin
@@ -93,13 +97,22 @@ begin
 			RESET_CMD1 <= '0';
 			RESET_CMD2 <= '0';
 
-			if rx_empty = '0' then
+			if rx_read = '1' then
 				if rx_cnt = 0 then -- expecting command
 					cmd <= rx_data;
 
 					if rx_data(7) = '1' and tx_write = '0' then
 						-- read register
-						tx_buf <= PERIOD2 & PERIOD1;
+						case rx_data(2 downto 0) is
+							when "000" =>
+								tx_buf <= std_logic_vector(SPEED2 & SPEED1);
+							when "010" =>
+								tx_buf <= std_logic_vector(POS1);
+							when "011" =>
+								tx_buf <= std_logic_vector(POS2);
+							when others =>
+								tx_buf <= x"deadbeef";
+						end case;
 						tx_cnt <= 4;
 					else
 						-- write ...
@@ -124,18 +137,18 @@ begin
 						-- received last data Word
 						case cmd(2 downto 0) is
 							when "000" => --SETPOINT
-								SETPNT1 <= rx_buf(7  downto 0) & rx_data;
-								SETPNT2 <= rx_buf(23 downto 8);
+								SETPNT1 <= signed(rx_buf(7  downto 0) & rx_data);
+								SETPNT2 <= signed(rx_buf(23 downto 8));
 							when "001" => --RESET POS
-								RESET_POS <= rx_buf & rx_data;
+								RESET_POS <= signed(rx_buf & rx_data);
 							when "100" => --P0
-								P0 <= rx_buf & rx_data;
+								P0 <= signed(rx_buf & rx_data);
 							when "101" => --P1
-								P1 <= rx_buf & rx_data;
+								P1 <= signed(rx_buf & rx_data);
 							when "110" => --P2
-								P2 <= rx_buf & rx_data;
+								P2 <= signed(rx_buf & rx_data);
 							when "111" => --P3
-								P3 <= rx_buf & rx_data;
+								P3 <= signed(rx_buf & rx_data);
 							when others =>
 						end case;
 					end if;
